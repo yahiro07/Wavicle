@@ -4,9 +4,6 @@ A browser-based keyboard app.
 
 ![screenshot](https://i.gyazo.com/1e993b64d63c7809d697d0af5f59f8dc.png)
 
-## Application
-https://miqsel.net/apps/wavicle
-
 ## Features
 There are 4 acoustic instrument and 20 synthesizer based timbres.
 You can play with PC keyboard or MIDI Keyboard.
@@ -23,8 +20,8 @@ Source samples are determined by selecting nearest waveform in note scale from p
 
 ## Debug
 ```
-yarn
-yarn start
+pnpm install
+pnpm start
 ```
 
 ## License

@@ -1,18 +1,18 @@
-import { css, domStyled, FC, jsx } from 'alumina';
-import { appConfig, appEnv, IKeyHoldEvent } from '~/base';
-import { appStore } from '~/store';
-import { KeysActiveRangeFrame, KeysBlock } from '../organisms';
+import { css, domStyled, FC, jsx } from "alumina";
+import { appConfig, IKeyHoldEvent } from "@/base";
+import { appStore } from "@/store";
+import { KeysActiveRangeFrame, KeysBlock } from "../organisms";
 
-const pcKeyboardKeyLabels = 'zsxdcvgbhnjmq2w3er5t6y7ui9o0p'
-  .toUpperCase()
-  .split('');
+// const pcKeyboardKeyLabels = "zsxdcvgbhnjmq2w3er5t6y7ui9o0p"
+//   .toUpperCase()
+//   .split("");
 
 export const MainKeysPanel: FC = () => {
   const { bottomNoteNumber, numKeys } = appConfig;
   const { holdNoteNumbers, noteOn, noteOff } = appStore.synthEngine;
   const {
     state: { keyRangeOffset, keysRangeSize },
-    readers: { pcKeyboardRootNoteNumber },
+    // readers: { pcKeyboardRootNoteNumber },
   } = appStore.uiPresenter;
 
   const edgeWidth = 2;
@@ -43,13 +43,13 @@ export const MainKeysPanel: FC = () => {
         holdNoteNumbers={holdNoteNumbers}
         onKeyHoldEvent={handleKeyHoldEvent}
         labelOptions={
-          (appEnv.isPc && {
-            rootNoteNumber: pcKeyboardRootNoteNumber,
-            labels: pcKeyboardKeyLabels,
-          }) ||
+          // (appEnv.isPc && {
+          //   rootNoteNumber: pcKeyboardRootNoteNumber,
+          //   labels: pcKeyboardKeyLabels,
+          // }) ||
           undefined
         }
-        showCenterCMark={true}
+        showCenterCMark={false}
         isMainKeys={true}
       />
     </KeysActiveRangeFrame>,
@@ -58,6 +58,6 @@ export const MainKeysPanel: FC = () => {
       border-left: solid ${edgeWidth2}px #0004;
       border-right: solid ${edgeWidth2}px #fff6;
       padding-bottom: 8px;
-    `
+    `,
   );
 };

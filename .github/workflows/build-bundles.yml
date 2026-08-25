@@ -1,0 +1,93 @@
+name: Build bundles branch
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - publish
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bundles-release
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Prepare bundles worktree
+        run: |
+          git fetch --force --tags origin
+          if git ls-remote --exit-code --heads origin bundles; then
+            git fetch origin bundles
+            git worktree add bundles-worktree origin/bundles
+          else
+            git worktree add --detach bundles-worktree
+            cd bundles-worktree
+            git switch --orphan bundles
+            git rm -rf . >/dev/null 2>&1 || true
+            find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          fi
+
+      - name: Sync dist to bundles branch root
+        run: |
+          find bundles-worktree -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R dist/. bundles-worktree/
+
+      - name: Commit, tag, and push bundles branch
+        run: |
+          cd bundles-worktree
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          last_n="$(
+            git ls-remote --tags origin \
+              | awk '{print $2}' \
+              | sed 's|^refs/tags/||; s|\^{}$||' \
+              | grep -E '^r[0-9]+$' \
+              | sed 's/^r//' \
+              | sort -n \
+              | tail -n 1
+          )"
+
+          if [ -z "$last_n" ]; then
+            next_tag="r0"
+          else
+            next_tag="r$((last_n + 1))"
+          fi
+
+          git commit -m "publish bundle ($next_tag)"
+          git tag "$next_tag"
+          git push origin HEAD:bundles
+          git push origin "$next_tag"

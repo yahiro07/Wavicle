@@ -1,10 +1,11 @@
-import { asyncRerender } from 'alumina';
-import { IInstrumentKey } from '~/base';
-import { arrays } from '~/funcs';
-import { createInstrumentProvider } from './instrumentProvider';
-import { createPitchShiftedNoteVoice } from './noteVoice';
-import { createNoteVoiceManager } from './noteVoiceManager';
-import { IInstrumentData, IInstrumentParameters } from './types';
+import { asyncRerender } from "alumina";
+import { IInstrumentKey } from "@/base";
+import { arrays } from "@/funcs";
+import { unitInterface } from "@/synthLib/unitInterface";
+import { createInstrumentProvider } from "./instrumentProvider";
+import { createPitchShiftedNoteVoice } from "./noteVoice";
+import { createNoteVoiceManager } from "./noteVoiceManager";
+import { IInstrumentData, IInstrumentParameters } from "./types";
 
 export interface ISynthesizerEngine {
   allInstrumentKeys: IInstrumentKey[];
@@ -17,15 +18,16 @@ export interface ISynthesizerEngine {
   noteReceived: boolean;
   initialize(): void;
   activateWebAudioOnUserAction(): void;
+  readOutputLevelDb(): number;
   setMasterVolume(value: number): void;
   setInstrumentParameter(key: keyof IInstrumentParameters, value: number): void;
   preloadAllInstrumentSamples(): Promise<void>;
   setInstrument(
     instrumentKey: IInstrumentKey,
-    updateReleaseParam: boolean
+    updateReleaseParam: boolean,
   ): void;
-  noteOn(noteNumber: number, velocity?: number): void;
-  noteOff(noteNumber: number): void;
+  noteOn(noteNumber: number, time?: number, velocity?: number): void;
+  noteOff(noteNumber: number, time?: number): void;
   finalize(): void;
 }
 
@@ -34,17 +36,22 @@ function createNoteKey(noteNumber: number): string {
 }
 
 export function createSynthesizerEngine(): ISynthesizerEngine {
-  const audioContext = new AudioContext();
+  const audioContext = unitInterface?.audioContext ?? new AudioContext();
   const instrumentProvider = createInstrumentProvider(audioContext);
   const { allInstrumentKeys } = instrumentProvider;
 
   const noteVoiceManager = createNoteVoiceManager();
   const voiceMixer = audioContext.createGain();
   const compressor = audioContext.createDynamicsCompressor();
+  const outputAnalyser = audioContext.createAnalyser();
+  const analyserBuffer = new Float32Array(outputAnalyser.fftSize);
 
-  voiceMixer.connect(compressor).connect(audioContext.destination);
+  voiceMixer
+    .connect(compressor)
+    .connect(outputAnalyser)
+    .connect(unitInterface?.audioOutputNode ?? audioContext.destination);
 
-  let timerId = undefined as NodeJS.Timeout | undefined;
+  let timerId = undefined as ReturnType<typeof setTimeout> | undefined;
   let masterVolume = 1;
   let isLoadingSamples = false;
   let instrumentData: IInstrumentData | undefined;
@@ -60,6 +67,19 @@ export function createSynthesizerEngine(): ISynthesizerEngine {
 
   function updateMasterMixerLevel() {
     voiceMixer.gain.value = masterVolume;
+  }
+
+  function readOutputLevelDb() {
+    outputAnalyser.getFloatTimeDomainData(analyserBuffer);
+    let sum = 0;
+    for (const sample of analyserBuffer) {
+      sum += sample * sample;
+    }
+    const rms = Math.sqrt(sum / analyserBuffer.length);
+    if (rms <= 0) {
+      return -80;
+    }
+    return Math.max(-80, Math.min(0, 20 * Math.log10(rms)));
   }
 
   const self: ISynthesizerEngine = {
@@ -91,11 +111,19 @@ export function createSynthesizerEngine(): ISynthesizerEngine {
     },
     activateWebAudioOnUserAction() {
       if (!webAudioInitialized) {
-        audioContext.resume();
+        if (
+          !(audioContext instanceof OfflineAudioContext) &&
+          audioContext.state === "suspended"
+        ) {
+          void audioContext.resume();
+        }
         webAudioInitialized = true;
         console.log(`web audio started`);
         asyncRerender();
       }
+    },
+    readOutputLevelDb() {
+      return readOutputLevelDb();
     },
     get isLoadingSamples() {
       return isLoadingSamples;
@@ -105,13 +133,12 @@ export function createSynthesizerEngine(): ISynthesizerEngine {
     },
     async setInstrument(
       instrumentKey: IInstrumentKey,
-      updateReleaseParam: boolean
+      updateReleaseParam: boolean,
     ) {
       currentInstrumentKey = instrumentKey;
       isLoadingSamples = true;
-      const tmpInstrumentData = await instrumentProvider.loadInstrument(
-        instrumentKey
-      );
+      const tmpInstrumentData =
+        await instrumentProvider.loadInstrument(instrumentKey);
       isLoadingSamples = false;
       if (currentInstrumentKey !== instrumentKey) {
         return;
@@ -119,15 +146,18 @@ export function createSynthesizerEngine(): ISynthesizerEngine {
       instrumentData = tmpInstrumentData;
 
       if (updateReleaseParam) {
-        self.setInstrumentParameter('release', instrumentData.releaseParam);
+        self.setInstrumentParameter("release", instrumentData.releaseParam);
       }
       asyncRerender();
     },
-    noteOn(noteNumber, _velocity?: number) {
+    noteOn(noteNumber, time, _velocity) {
+      time = Math.max(time ?? 0, audioContext.currentTime);
       if (!instrumentData) {
+        console.warn(`noteOn called while instrumentData is not loaded`);
         return;
       }
       if (isLoadingSamples) {
+        console.warn(`noteOn called while isLoadingSamples`);
         return;
       }
       const noteKey = createNoteKey(noteNumber);
@@ -138,15 +168,16 @@ export function createSynthesizerEngine(): ISynthesizerEngine {
         sampleSources,
         instrumentParameters,
         gainAdjustment,
-        voiceMixer
+        voiceMixer,
       );
-      noteVoiceManager.noteOn(noteKey, voice);
+      noteVoiceManager.noteOn(noteKey, time, voice);
       holdNoteNumbers.push(noteNumber);
       noteReceived = true;
     },
-    noteOff(noteNumber) {
+    noteOff(noteNumber, time) {
+      time = Math.max(time ?? 0, audioContext.currentTime);
       const noteKey = createNoteKey(noteNumber);
-      noteVoiceManager.noteOff(noteKey);
+      noteVoiceManager.noteOff(noteKey, time);
       arrays.remove(holdNoteNumbers, noteNumber);
     },
     finalize() {
