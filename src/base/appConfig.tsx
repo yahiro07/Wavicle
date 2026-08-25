@@ -1,5 +1,5 @@
 export const appConfig = {
-  versionCode: 'v220907',
+  versionCode: "v250825",
   bottomNoteNumber: 24,
   numKeys: 85,
   activeKeyRangeUnitOffsetDefault: 14,
@@ -9,9 +9,12 @@ export const appConfig = {
 };
 
 export const appEnv = {
-  isJapaneseEnvironment: !!navigator.language.match(/ja|ja-JP/),
-  isWebMidiSupported: !!navigator.requestMIDIAccess,
-  isMobile: navigator.userAgent.match(/iPhone|Android.+Mobile/),
+  // isJapaneseEnvironment: !!navigator.language.match(/ja|ja-JP/),
+  // isWebMidiSupported: !!navigator.requestMIDIAccess,
+  // isMobile: navigator.userAgent.match(/iPhone|Android.+Mobile/),
+  isJapaneseEnvironment: false,
+  isWebMidiSupported: false,
+  isMobile: false,
   get isPc() {
     return !appEnv.isMobile;
   },

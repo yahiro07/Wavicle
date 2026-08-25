@@ -5,15 +5,13 @@ import { LevelMeterGauge } from "@/ui/organisms/LevelMeterGauge";
 import { CompactModeSwitcher } from "@/ui/panels/CompactModeSwitcher";
 import { useUiThemeContext } from "./base";
 import {
-  InstrumentSelectionPart,
-  KeysActiveAreaSlider,
-  MainKeysPanel,
-  OctaveShifterPart,
+  InstrumentSelectionPartHorizontal_Buttons,
+  InstrumentSelectionPartHorizontal_Selector,
   ParameterControlsPart,
-  TitlesPart,
+  TitlesPartCore,
 } from "./panels";
 
-export const MainPanel: FC = () => {
+export const MainPanelCompact: FC = () => {
   const { colors } = useUiThemeContext();
   const { outputLevel01 } = appStore.uiPresenter.state;
   const fgColor = colors.clForeground;
@@ -23,82 +21,68 @@ export const MainPanel: FC = () => {
 
   return domStyled(
     <div>
-      <div class="top-row">
-        <InstrumentSelectionPart />
-        <ParameterControlsPart />
-        <div class="top-right-part">
+      <div class="content">
+        <div class="top-row">
+          <TitlesPartCore />
           <CompactModeSwitcher />
         </div>
-        <TitlesPart />
-      </div>
-      <div class="second-row">
-        <div class="keys-box">
-          <OctaveShifterPart />
-          <KeysActiveAreaSlider />
+        <div class="main-row">
+          <div class="selectors-part">
+            <InstrumentSelectionPartHorizontal_Selector />
+            <InstrumentSelectionPartHorizontal_Buttons class="shifter-buttons" />
+          </div>
+          <div class="controls-part-box">
+            <ParameterControlsPart />
+            <LevelMeterGauge level={outputLevel01} />
+          </div>
         </div>
-        <LevelMeterGauge level={outputLevel01} />
-      </div>
-      <div class="main-keys-row">
-        <MainKeysPanel />
       </div>
       <div class="cover" />
     </div>,
     css`
       position: relative;
-      padding: 15px 15px 0;
       background: ${panelColor};
       border-radius: 2px;
-      width: 800px;
-      height: 450px;
+      width: 400px;
+      height: 225px;
       font-size: 16px;
       flex-shrink: 0;
       user-select: none;
       color: ${fgColor};
-
       display: flex;
-      flex-direction: column;
+      justify-content: center;
+      align-items: center;
 
-      > div {
-        /* border: solid 1px #888; */
-      }
-
-      > .top-row {
-        position: relative;
+      > .content{
+        margin-top: -20px;
         display: flex;
-        justify-content: flex-end;
-        gap: 10px;
-        padding: 10px;
-        padding-bottom: 5px;
+        flex-direction: column;
 
-        > .top-right-part {
-          margin-left: 40px;
-        }
-        margin-bottom: auto;
-      }
-
-      > .second-row {
-        display: flex;
-        align-items: center;
-        padding: 0 10px;
-        gap: 10px;
-
-        > .keys-box {
+        > .top-row{
           display: flex;
-          gap: 10px;
+          justify-content: space-between;
           align-items: center;
+          margin-left: -8px;
         }
 
-        > .midi-in-part {
-          margin-left: auto;
-          margin-bottom: 1px;
-        }
-      }
+        > .main-row{
+          display: flex;
+          gap: 30px;
 
-      > .main-keys-row {
-        margin-top: 10px;
-        display: flex;
-        justify-content: center;
-        margin-bottom: 3px;
+          > .selectors-part {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            
+          }
+
+          > .controls-part-box{
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding-bottom: 4px;
+          }
+        }
       }
 
       > .cover {

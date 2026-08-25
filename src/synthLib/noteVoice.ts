@@ -1,18 +1,18 @@
-import { IInstrumentParameters, INoteSampleSource } from './types';
+import { IInstrumentParameters, INoteSampleSource } from "./types";
 
 export type INoteVoice = {
-  noteOn(): void;
-  noteOff(): void;
-  update(elapsedMs: number): boolean;
-  forceStop(): void;
+  noteOn(time: number): void;
+  noteOff(time: number): void;
+  update(): boolean;
+  forceStop(time: number): void;
 };
 
 function getNearestSampleSource(
   noteNumber: number,
-  sampleSources: INoteSampleSource[]
+  sampleSources: INoteSampleSource[],
 ) {
   const distances = sampleSources.map((it) =>
-    Math.abs(it.noteNumber - noteNumber)
+    Math.abs(it.noteNumber - noteNumber),
   );
   const minDistance = Math.min(...distances);
   const index = distances.indexOf(minDistance);
@@ -25,7 +25,7 @@ export function createPitchShiftedNoteVoice(
   samplesSources: INoteSampleSource[],
   toneParameters: IInstrumentParameters,
   gainAdjustment: number,
-  destinationNode: AudioNode
+  destinationNode: AudioNode,
 ): INoteVoice {
   const sr = audioContext.sampleRate;
   const sampleSource = getNearestSampleSource(noteNumber, samplesSources);
@@ -52,30 +52,29 @@ export function createPitchShiftedNoteVoice(
   gain.gain.value = noteGainTop;
   source.connect(gain).connect(destinationNode);
 
-  const samplesDurationMs =
-    (sampleSource.samples.duration / playbackRate) * 1000;
+  const samplesDurationSec = sampleSource.samples.duration / playbackRate;
 
-  let hold = true;
-  let releaseTick = 0;
-  let lifeTick = 0;
+  let noteStartTime: number;
+  let noteEndTime: number | undefined;
 
-  function setGainTransition(v0: number, v1: number, durationMs: number) {
-    gain.gain.setValueAtTime(v0, audioContext.currentTime);
-    const endTime = audioContext.currentTime + durationMs / 1000;
+  function setGainTransition(
+    time: number,
+    v0: number,
+    v1: number,
+    durationMs: number,
+  ) {
+    gain.gain.setValueAtTime(v0, time);
+    const endTime = time + durationMs / 1000;
     gain.gain.linearRampToValueAtTime(v1, endTime);
   }
 
-  const noteOn = () => {
-    // console.log(`note on ${noteNumber}`);
-    source.start(0);
-    lifeTick = 0;
-    // setGainTransition(0, noteGainTop, 60);
+  const noteOn = (time: number) => {
+    source.start(time);
+    noteStartTime = time;
   };
-  const noteOff = () => {
-    // console.log(`note off ${noteNumber}`);
-    hold = false;
-    releaseTick = 0;
-    setGainTransition(noteGainTop, 0, releaseTimeMs);
+  const noteOff = (time: number) => {
+    noteEndTime = time;
+    setGainTransition(time, noteGainTop, 0, releaseTimeMs);
   };
 
   const stop = () => {
@@ -83,24 +82,23 @@ export function createPitchShiftedNoteVoice(
     source.disconnect();
   };
 
-  const forceStop = () => {
-    hold = false;
-    releaseTick = 0;
+  const forceStop = (time: number) => {
+    noteEndTime = time;
     releaseTimeMs = Math.min(releaseTimeMs, 50);
-    setGainTransition(gain.gain.value, 0, releaseTimeMs);
+    setGainTransition(time, gain.gain.value, 0, releaseTimeMs);
   };
 
-  const update = (elapsedMs: number): boolean => {
-    if (!hold) {
-      releaseTick += elapsedMs;
-      const done = releaseTick > releaseTimeMs;
+  const update = (): boolean => {
+    if (noteEndTime !== undefined) {
+      const done =
+        audioContext.currentTime >= noteEndTime + releaseTimeMs / 1000;
       if (done) {
         stop();
         return true;
       }
     }
-    lifeTick += elapsedMs;
-    if (!looped && lifeTick > samplesDurationMs) {
+    const lifeTick = audioContext.currentTime - noteStartTime;
+    if (!looped && lifeTick > samplesDurationSec) {
       stop();
       return true;
     }

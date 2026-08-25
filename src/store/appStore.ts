@@ -1,10 +1,6 @@
-import {
-  createMidiInputDriver,
-  IMidiInputDriver,
-  setupPcKeyboardHandler,
-} from '../periphery';
-import { createSynthesizerEngine, ISynthesizerEngine } from '../synthLib';
-import { createUiPresenter, IUiPresenter } from './uiPresenter';
+import { createMidiInputDriverDummy, IMidiInputDriver } from "../periphery";
+import { createSynthesizerEngine, ISynthesizerEngine } from "../synthLib";
+import { createUiPresenter, IUiPresenter } from "./uiPresenter";
 
 interface IAppStore {
   initialize(): Promise<void>;
@@ -15,7 +11,7 @@ interface IAppStore {
 
 function createAppStore(): IAppStore {
   const synthEngine = createSynthesizerEngine();
-  const midiInputDriver = createMidiInputDriver(synthEngine);
+  const midiInputDriver = createMidiInputDriverDummy(synthEngine);
   const uiPresenter = createUiPresenter(synthEngine);
   return {
     synthEngine,
@@ -23,12 +19,13 @@ function createAppStore(): IAppStore {
     uiPresenter,
     async initialize() {
       synthEngine.initialize();
+      uiPresenter.actions.initialize();
       synthEngine.setInstrument(synthEngine.currentInstrumentKey, false); // initial load
-      setupPcKeyboardHandler(synthEngine, {
-        getRootNoteNumber() {
-          return uiPresenter.readers.pcKeyboardRootNoteNumber;
-        },
-      });
+      // setupPcKeyboardHandler(synthEngine, {
+      //   getRootNoteNumber() {
+      //     return uiPresenter.readers.pcKeyboardRootNoteNumber;
+      //   },
+      // });
       await midiInputDriver.initialize();
     },
   };
